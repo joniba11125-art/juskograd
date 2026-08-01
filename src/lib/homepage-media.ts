@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export const homepageImageSlots = [
   {
@@ -61,53 +62,49 @@ export const homepageImageSlots = [
   },
 ];
 
-const DB_NAME = "juskograd-homepage-media";
-const STORE_NAME = "images";
-
-function openDb() {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore(STORE_NAME);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+function publicUrl(path: string) {
+  return supabase.storage.from("site-images").getPublicUrl(path).data.publicUrl;
 }
 
 export async function getHomepageImage(id: string) {
-  const db = await openDb();
-  return new Promise<Blob | undefined>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const request = tx.objectStore(STORE_NAME).get(id);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-    tx.oncomplete = () => db.close();
-  });
+  const { data, error } = await supabase.from("homepage_images").select("storage_path").eq("slot_id", id).maybeSingle();
+  if (error) throw error;
+  return data?.storage_path ? publicUrl(data.storage_path) : undefined;
 }
 
 export async function setHomepageImage(id: string, blob: Blob | null) {
-  const db = await openDb();
-  return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    if (blob) tx.objectStore(STORE_NAME).put(blob, id); else tx.objectStore(STORE_NAME).delete(id);
-    tx.oncomplete = () => { db.close(); window.dispatchEvent(new CustomEvent("homepage-media-change", { detail: id })); resolve(); };
-    tx.onerror = () => reject(tx.error);
-  });
+  const { data: current, error: currentError } = await supabase.from("homepage_images").select("storage_path").eq("slot_id", id).maybeSingle();
+  if (currentError) throw currentError;
+  if (!blob) {
+    const { error } = await supabase.from("homepage_images").delete().eq("slot_id", id);
+    if (error) throw error;
+    if (current?.storage_path) await supabase.storage.from("site-images").remove([current.storage_path]);
+    window.dispatchEvent(new CustomEvent("homepage-media-change", { detail: id }));
+    return null;
+  }
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error("Niste prijavljeni.");
+  const path = `homepage/${id}-${Date.now()}-${crypto.randomUUID()}.webp`;
+  const { error: uploadError } = await supabase.storage.from("site-images").upload(path, blob, { contentType: "image/webp" });
+  if (uploadError) throw uploadError;
+  const { error } = await supabase.from("homepage_images").upsert({ slot_id: id, storage_path: path, updated_by: userData.user.id, updated_at: new Date().toISOString() });
+  if (error) { await supabase.storage.from("site-images").remove([path]); throw error; }
+  if (current?.storage_path) await supabase.storage.from("site-images").remove([current.storage_path]);
+  window.dispatchEvent(new CustomEvent("homepage-media-change", { detail: id }));
+  return publicUrl(path);
 }
 
 export function useHomepageImage(id: string, fallback: string) {
   const [src, setSrc] = useState(fallback);
   useEffect(() => {
-    let objectUrl: string | null = null;
     async function load() {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      const blob = await getHomepageImage(id);
-      objectUrl = blob ? URL.createObjectURL(blob) : null;
-      setSrc(objectUrl ?? fallback);
+      const url = await getHomepageImage(id);
+      setSrc(url ?? fallback);
     }
     void load();
     const handler = (event: Event) => { if ((event as CustomEvent<string>).detail === id) void load(); };
     window.addEventListener("homepage-media-change", handler);
-    return () => { window.removeEventListener("homepage-media-change", handler); if (objectUrl) URL.revokeObjectURL(objectUrl); };
+    return () => window.removeEventListener("homepage-media-change", handler);
   }, [id, fallback]);
   return src;
 }

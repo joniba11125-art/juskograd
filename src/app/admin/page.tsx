@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, ImagePlus, Images, Trash2, X } from "lucide-react";
 import { deleteGalleryProject, GalleryProject, getGalleryProjects, saveGalleryProject } from "@/lib/gallery-db";
 import { getHomepageImage, homepageImageSlots, setHomepageImage } from "@/lib/homepage-media";
+import { supabase } from "@/lib/supabase";
 
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const CROP_RATIO = 4 / 3;
@@ -41,6 +42,11 @@ async function cropToFourThree(file: File) {
 }
 
 export default function AdminPage() {
+  const [authLoading, setAuthLoading] = useState(true);
+  const [adminEmail, setAdminEmail] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -55,13 +61,28 @@ export default function AdminPage() {
   const previews = useMemo(() => files.map((file) => ({ file, url: URL.createObjectURL(file) })), [files]);
 
   useEffect(() => {
+    async function checkAdmin() {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) { setAdminEmail(""); setAuthLoading(false); return; }
+      const { data } = await supabase.from("admin_users").select("user_id").eq("user_id", userData.user.id).maybeSingle();
+      setAdminEmail(data ? (userData.user.email ?? "Administrator") : "");
+      if (!data) setAuthError("Ovaj korisnik nema administratorski pristup.");
+      setAuthLoading(false);
+    }
+    void checkAdmin();
+    const { data: listener } = supabase.auth.onAuthStateChange(() => void checkAdmin());
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!adminEmail) return;
     getGalleryProjects().then(setProjects).catch(() => setStatus("Sadržaj nije moguće učitati."));
     homepageImageSlots.forEach((slot) => {
-      getHomepageImage(slot.id).then((blob) => {
-        if (blob) setHomepagePreviews((current) => ({ ...current, [slot.id]: URL.createObjectURL(blob) }));
+      getHomepageImage(slot.id).then((url) => {
+        if (url) setHomepagePreviews((current) => ({ ...current, [slot.id]: url }));
       });
     });
-  }, []);
+  }, [adminEmail]);
 
   useEffect(() => () => previews.forEach((preview) => URL.revokeObjectURL(preview.url)), [previews]);
 
@@ -98,23 +119,15 @@ export default function AdminPage() {
     }
 
     setIsSaving(true);
-    const project: GalleryProject = {
-      id: crypto.randomUUID(),
-      title: title.trim(),
-      description: description.trim(),
-      images: files,
-      createdAt: Date.now(),
-    };
-
     try {
-      await saveGalleryProject(project);
+      const project = await saveGalleryProject({ title: title.trim(), description: description.trim(), files });
       setProjects((current) => [project, ...current]);
       setTitle("");
       setDescription("");
       setFiles([]);
       setStatus("Projekt je objavljen u galeriji.");
     } catch {
-      setStatus("Projekt nije spremljen. Provjerite slobodan prostor u pregledniku.");
+      setStatus("Projekt nije spremljen. Provjerite Supabase postavke i pokušajte ponovo.");
     } finally {
       setIsSaving(false);
     }
@@ -122,7 +135,7 @@ export default function AdminPage() {
 
   async function removeProject(project: GalleryProject) {
     if (!window.confirm(`Obrisati projekt „${project.title}“?`)) return;
-    await deleteGalleryProject(project.id);
+    await deleteGalleryProject(project);
     setProjects((current) => current.filter((item) => item.id !== project.id));
     setStatus("Projekt je obrisan.");
   }
@@ -134,8 +147,8 @@ export default function AdminPage() {
     }
     setStatus("Obrezujem novu sliku na format 4:3...");
     const cropped = await cropToFourThree(file);
-    await setHomepageImage(slotId, cropped);
-    setHomepagePreviews((current) => ({ ...current, [slotId]: URL.createObjectURL(cropped) }));
+    const url = await setHomepageImage(slotId, cropped);
+    if (url) setHomepagePreviews((current) => ({ ...current, [slotId]: url }));
     setStatus("Slika na naslovnoj stranici je zamijenjena.");
   }
 
@@ -144,6 +157,30 @@ export default function AdminPage() {
     setHomepagePreviews((current) => ({ ...current, [slotId]: defaultSrc }));
     setStatus("Vraćena je originalna slika.");
   }
+
+  async function login(event: FormEvent) {
+    event.preventDefault();
+    setAuthLoading(true);
+    setAuthError("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) { setAuthError("Pogrešan email ili lozinka."); setAuthLoading(false); }
+  }
+
+  if (authLoading) return <main className="admin-login-page"><div className="admin-login-card"><p>Učitavanje administracije...</p></div></main>;
+  if (!adminEmail) return (
+    <main className="admin-login-page">
+      <form className="admin-login-card" onSubmit={login}>
+        <img src="/images/logo/juskograd-logo.png" alt="JUSKO GRAD" />
+        <span>ZAŠTIĆENA ADMINISTRACIJA</span>
+        <h1>Prijava</h1>
+        <label className="admin-field"><span>Email</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
+        <label className="admin-field"><span>Lozinka</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
+        {authError && <p className="admin-status">{authError}</p>}
+        <button className="admin-publish-button" type="submit">Prijavi se</button>
+        <a href="/">← Povratak na stranicu</a>
+      </form>
+    </main>
+  );
 
   return (
     <main className="admin-page">
@@ -156,7 +193,7 @@ export default function AdminPage() {
           <a className="active" href="/admin"><Images size={19} /> Galerija</a>
           <a href="/galerija"><ArrowLeft size={19} /> Javna galerija</a>
         </nav>
-        <span className="admin-local-badge">Lokalna administracija</span>
+        <button className="admin-local-badge" type="button" onClick={() => void supabase.auth.signOut()}>Odjava · {adminEmail}</button>
       </aside>
 
       <section className="admin-main">
@@ -220,16 +257,13 @@ export default function AdminPage() {
 
             {projects.length ? (
               <div className="admin-project-list">
-                {projects.map((project) => {
-                  const coverUrl = URL.createObjectURL(project.images[0]);
-                  return (
+                {projects.map((project) => (
                     <article key={project.id}>
-                      <img src={coverUrl} alt="" onLoad={() => URL.revokeObjectURL(coverUrl)} />
+                      <img src={project.images[0].url} alt="" />
                       <div><strong>{project.title}</strong><span>{project.images.length} {project.images.length === 1 ? "slika" : "slika"}</span></div>
                       <button type="button" onClick={() => void removeProject(project)} aria-label={`Obriši ${project.title}`}><Trash2 size={17} /></button>
                     </article>
-                  );
-                })}
+                ))}
               </div>
             ) : (
               <div className="admin-empty-projects"><Images size={30} /><strong>Nema objavljenih projekata</strong><span>Prvi projekt će se pojaviti ovdje.</span></div>

@@ -12774,6 +12774,12 @@ body.worksite-gallery-open {
 }
 
 /* ===== LOCAL ADMIN DASHBOARD ===== */
+.admin-login-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: linear-gradient(145deg, #06182a, #0b3b62); color: #071d33; }
+.admin-login-card { width: min(440px, 100%); padding: 36px; border-radius: 28px; background: #fff; box-shadow: 0 30px 100px rgba(0,0,0,.3); }
+.admin-login-card > img { width: 190px; height: auto; margin-bottom: 28px; }
+.admin-login-card > span { display: block; color: #0873bd; font-size: 10px; font-weight: 950; letter-spacing: .16em; }
+.admin-login-card h1 { margin: 7px 0 24px; font-size: 42px; letter-spacing: -.05em; }
+.admin-login-card > a { display: block; margin-top: 18px; color: #64748b; font-size: 13px; text-align: center; }
 .admin-page {
   min-height: 100vh;
   display: grid;
@@ -12807,7 +12813,7 @@ body.worksite-gallery-open {
 .admin-sidebar nav { display: grid; gap: 8px; }
 .admin-sidebar nav a { display: flex; align-items: center; gap: 11px; padding: 13px 14px; border-radius: 14px; color: rgba(255,255,255,.7); font-weight: 800; }
 .admin-sidebar nav a:hover, .admin-sidebar nav a.active { background: rgba(255,255,255,.11); color: #ffffff; }
-.admin-local-badge { margin-top: auto; padding: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; color: rgba(255,255,255,.62); font-size: 12px; text-align: center; }
+.admin-local-badge { margin-top: auto; padding: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: transparent; color: rgba(255,255,255,.62); font: inherit; font-size: 12px; text-align: center; cursor: pointer; }
 
 .admin-main { min-width: 0; padding: 48px clamp(24px, 4vw, 64px) 80px; }
 .admin-header { max-width: 1240px; display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; margin: 0 auto 34px; }

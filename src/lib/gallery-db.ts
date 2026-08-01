@@ -1,60 +1,99 @@
+import { supabase } from "@/lib/supabase";
+
+export type GalleryImage = {
+  id: string;
+  storagePath: string;
+  url: string;
+  sortOrder: number;
+};
+
 export type GalleryProject = {
   id: string;
   title: string;
   description: string;
-  images: Blob[];
-  createdAt: number;
+  images: GalleryImage[];
+  createdAt: string;
 };
 
-const DB_NAME = "juskograd-content";
-const STORE_NAME = "gallery-projects";
+type ProjectRow = {
+  id: string;
+  title: string;
+  description: string;
+  created_at: string;
+  gallery_images: Array<{ id: string; storage_path: string; sort_order: number }>;
+};
 
-function openDb() {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME, { keyPath: "id" });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+function publicUrl(path: string) {
+  return supabase.storage.from("site-images").getPublicUrl(path).data.publicUrl;
+}
+
+function mapProject(row: ProjectRow): GalleryProject {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    createdAt: row.created_at,
+    images: [...(row.gallery_images ?? [])]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((image) => ({
+        id: image.id,
+        storagePath: image.storage_path,
+        sortOrder: image.sort_order,
+        url: publicUrl(image.storage_path),
+      })),
+  };
 }
 
 export async function getGalleryProjects() {
-  const db = await openDb();
-  return new Promise<GalleryProject[]>((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readonly");
-    const request = transaction.objectStore(STORE_NAME).getAll();
-    request.onsuccess = () => resolve(request.result.sort((a, b) => b.createdAt - a.createdAt));
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => db.close();
-  });
+  const { data, error } = await supabase
+    .from("gallery_projects")
+    .select("id,title,description,created_at,gallery_images(id,storage_path,sort_order)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as ProjectRow[]).map(mapProject);
 }
 
-export async function saveGalleryProject(project: GalleryProject) {
-  const db = await openDb();
-  return new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).put(project);
-    transaction.oncomplete = () => {
-      db.close();
-      resolve();
-    };
-    transaction.onerror = () => reject(transaction.error);
-  });
+export async function saveGalleryProject(input: { title: string; description: string; files: File[] }) {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error("Niste prijavljeni.");
+
+  const { data: project, error: projectError } = await supabase
+    .from("gallery_projects")
+    .insert({ title: input.title, description: input.description, created_by: userData.user.id, published: true })
+    .select("id,title,description,created_at")
+    .single();
+  if (projectError) throw projectError;
+
+  const uploadedPaths: string[] = [];
+  try {
+    for (let index = 0; index < input.files.length; index += 1) {
+      const file = input.files[index];
+      const path = `gallery/${project.id}/${String(index + 1).padStart(2, "0")}-${crypto.randomUUID()}.webp`;
+      const { error: uploadError } = await supabase.storage.from("site-images").upload(path, file, { contentType: "image/webp", upsert: false });
+      if (uploadError) throw uploadError;
+      uploadedPaths.push(path);
+    }
+
+    const { error: imageError } = await supabase.from("gallery_images").insert(
+      uploadedPaths.map((path, index) => ({ project_id: project.id, storage_path: path, sort_order: index })),
+    );
+    if (imageError) throw imageError;
+  } catch (error) {
+    if (uploadedPaths.length) await supabase.storage.from("site-images").remove(uploadedPaths);
+    await supabase.from("gallery_projects").delete().eq("id", project.id);
+    throw error;
+  }
+
+  const projects = await getGalleryProjects();
+  return projects.find((item) => item.id === project.id)!;
 }
 
-export async function deleteGalleryProject(id: string) {
-  const db = await openDb();
-  return new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).delete(id);
-    transaction.oncomplete = () => {
-      db.close();
-      resolve();
-    };
-    transaction.onerror = () => reject(transaction.error);
-  });
+export async function deleteGalleryProject(project: GalleryProject) {
+  const paths = project.images.map((image) => image.storagePath);
+  if (paths.length) {
+    const { error: storageError } = await supabase.storage.from("site-images").remove(paths);
+    if (storageError) throw storageError;
+  }
+  const { error } = await supabase.from("gallery_projects").delete().eq("id", project.id);
+  if (error) throw error;
 }
