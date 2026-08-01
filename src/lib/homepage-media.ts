@@ -74,12 +74,9 @@ export async function getHomepageImage(id: string) {
 }
 
 export async function setHomepageImage(id: string, blob: Blob | null) {
-  const { data: current, error: currentError } = await supabase.from("homepage_images").select("storage_path").eq("slot_id", id).maybeSingle();
-  if (currentError) throw currentError;
   if (!blob) {
     const { error } = await supabase.from("homepage_images").delete().eq("slot_id", id);
     if (error) throw error;
-    if (current?.storage_path) await supabase.storage.from("site-images").remove([current.storage_path]);
     window.dispatchEvent(new CustomEvent("homepage-media-change", { detail: id }));
     return null;
   }
@@ -88,9 +85,13 @@ export async function setHomepageImage(id: string, blob: Blob | null) {
   const path = `homepage/${id}-${Date.now()}-${crypto.randomUUID()}.webp`;
   const { error: uploadError } = await supabase.storage.from("site-images").upload(path, blob, { contentType: "image/webp" });
   if (uploadError) throw uploadError;
+  const { error: verifyError } = await supabase.storage.from("site-images").download(path);
+  if (verifyError) {
+    await supabase.storage.from("site-images").remove([path]);
+    throw verifyError;
+  }
   const { error } = await supabase.from("homepage_images").upsert({ slot_id: id, storage_path: path, updated_by: userData.user.id, updated_at: new Date().toISOString() });
   if (error) { await supabase.storage.from("site-images").remove([path]); throw error; }
-  if (current?.storage_path) await supabase.storage.from("site-images").remove([current.storage_path]);
   window.dispatchEvent(new CustomEvent("homepage-media-change", { detail: id }));
   return publicUrl(path, String(Date.now()));
 }
@@ -101,7 +102,9 @@ export function useHomepageImage(id: string, fallback: string) {
     async function load() {
       try {
         const url = await getHomepageImage(id);
-        setSrc(url ?? fallback);
+        if (!url) { setSrc(fallback); return; }
+        const response = await fetch(url, { cache: "no-store" });
+        setSrc(response.ok && response.headers.get("content-type")?.startsWith("image/") ? url : fallback);
       } catch {
         setSrc(fallback);
       }
