@@ -12914,10 +12914,19 @@ body.worksite-gallery-open {
 .project-viewer-panel { width: min(1080px, 100%); max-height: calc(100vh - 100px); display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, .5fr); overflow: hidden; border-radius: 26px; background: #fff; box-shadow: 0 35px 120px rgba(0,0,0,.42); }
 .project-viewer-image { min-height: 580px; background: #06182a; }
 .project-viewer-image img { width: 100%; height: 100%; max-height: calc(100vh - 100px); object-fit: contain; }
-.project-viewer-info { display: flex; flex-direction: column; justify-content: flex-start; padding: 30px; }
-.project-viewer-info span { margin-top: auto; color: #0873bd; font-size: 11px; font-weight: 900; letter-spacing: .14em; }
+.project-viewer-info { display: flex; flex-direction: column; justify-content: flex-start; padding: 32px 28px 24px; }
+.project-viewer-copy { min-width: 0; }
+.project-viewer-info .project-viewer-eyebrow { display: block; margin: 0 0 10px; color: #0873bd; font-size: 9px; font-weight: 950; letter-spacing: .17em; }
 .project-viewer-info h2 { margin: 0; font-size: 32px; line-height: 1; letter-spacing: -.05em; }
-.project-viewer-info p { margin: 16px 0 0; color: #64748b; line-height: 1.65; }
+.project-viewer-description { margin-top: 28px; padding-top: 18px; border-top: 1px solid #e2e9ef; }
+.project-viewer-description strong { display: block; color: #0873bd; font-size: 9px; letter-spacing: .16em; }
+.project-viewer-info .project-viewer-description p { margin: 9px 0 0; color: #64748b; line-height: 1.65; }
+.project-viewer-contact { margin-top: auto; padding: 22px 0 16px; border-top: 1px solid #e2e9ef; }
+.project-viewer-contact > strong { display: block; color: #52677b; font-size: 9px; letter-spacing: .11em; }
+.project-viewer-contact > div { display: flex; gap: 8px; margin-top: 12px; }
+.project-viewer-contact a { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid #d9e6ef; border-radius: 13px; background: #f2f7fb; color: #0873bd; transition: .2s ease; }
+.project-viewer-contact a:hover { border-color: #0873bd; background: #0873bd; color: #fff; transform: translateY(-2px); }
+.project-viewer-info .project-viewer-count { display: block; margin: 0; color: #0873bd; font-size: 10px; font-weight: 900; letter-spacing: .14em; }
 .project-viewer-close, .project-viewer-arrow { position: fixed; z-index: 2; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.12); color: #fff; cursor: pointer; backdrop-filter: blur(10px); }
 .project-viewer-close { top: 20px; right: 22px; width: 46px; height: 46px; border-radius: 999px; }
 .project-viewer-arrow { top: 50%; width: 50px; height: 62px; border-radius: 999px; font-size: 38px; transform: translateY(-50%); }
@@ -12951,6 +12960,9 @@ body.worksite-gallery-open {
   .project-viewer { padding: 74px 14px 24px; }
   .project-viewer-panel { max-height: calc(100svh - 100px); }
   .project-viewer-image { min-height: 48svh; }
+  .project-viewer-info { padding: 24px; }
+  .project-viewer-description { margin-top: 20px; }
+  .project-viewer-contact { margin-top: 24px; }
   .project-viewer-arrow { width: 38px; height: 50px; font-size: 30px; background: rgba(7,29,51,.56); }
   .project-viewer-arrow.left { left: 8px; }
   .project-viewer-arrow.right { right: 8px; }

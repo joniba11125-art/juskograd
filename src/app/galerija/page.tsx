@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Images, X } from "lucide-react";
+import { Images, Mail, MessageCircle, Phone, X } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { GalleryProject, getGalleryProjects } from "@/lib/gallery-db";
@@ -9,9 +9,9 @@ import type { Lang } from "@/lib/language";
 
 const LANGUAGE_KEY = "juskograd-language";
 const galleryCopy = {
-  bs: { kicker: "JUSKO GRAD / PROJEKTI", title: "Galerija radova", subtitle: "Fotografije projekata, gradilišta i završenih radova.", completed: "IZVEDENI RADOVI", oneProject: "objavljen projekt", projects: "objavljenih projekata", onePhoto: "fotografija", photos: "fotografije", emptyTitle: "Galerija je trenutno prazna", emptyText: "Novi projekti bit će objavljeni uskoro.", galleryLabel: "Galerija projekata", close: "Zatvori", previous: "Prethodna", next: "Sljedeća" },
-  sl: { kicker: "JUSKO GRAD / PROJEKTI", title: "Galerija del", subtitle: "Fotografije projektov, gradbišč in zaključenih del.", completed: "IZVEDENA DELA", oneProject: "objavljen projekt", projects: "objavljeni projekti", onePhoto: "fotografija", photos: "fotografije", emptyTitle: "Galerija je trenutno prazna", emptyText: "Novi projekti bodo objavljeni kmalu.", galleryLabel: "Galerija projektov", close: "Zapri", previous: "Prejšnja", next: "Naslednja" },
-  de: { kicker: "JUSKO GRAD / PROJEKTE", title: "Projektgalerie", subtitle: "Fotos von Projekten, Baustellen und abgeschlossenen Arbeiten.", completed: "AUSGEFÜHRTE ARBEITEN", oneProject: "veröffentlichtes Projekt", projects: "veröffentlichte Projekte", onePhoto: "Foto", photos: "Fotos", emptyTitle: "Die Galerie ist derzeit leer", emptyText: "Neue Projekte werden demnächst veröffentlicht.", galleryLabel: "Projektgalerie", close: "Schließen", previous: "Zurück", next: "Weiter" },
+  bs: { kicker: "JUSKO GRAD / PROJEKTI", title: "Galerija radova", subtitle: "Fotografije projekata, gradilišta i završenih radova.", completed: "IZVEDENI RADOVI", oneProject: "objavljen projekt", projects: "objavljenih projekata", onePhoto: "fotografija", photos: "fotografije", emptyTitle: "Galerija je trenutno prazna", emptyText: "Novi projekti bit će objavljeni uskoro.", galleryLabel: "Galerija projekata", close: "Zatvori", previous: "Prethodna", next: "Sljedeća", project: "PROJEKT", description: "OPIS", contact: "ZANIMA VAS SLIČAN PROJEKT?", call: "Pozovite nas", email: "Pošaljite e-mail", inquiry: "Pošaljite upit" },
+  sl: { kicker: "JUSKO GRAD / PROJEKTI", title: "Galerija del", subtitle: "Fotografije projektov, gradbišč in zaključenih del.", completed: "IZVEDENA DELA", oneProject: "objavljen projekt", projects: "objavljeni projekti", onePhoto: "fotografija", photos: "fotografije", emptyTitle: "Galerija je trenutno prazna", emptyText: "Novi projekti bodo objavljeni kmalu.", galleryLabel: "Galerija projektov", close: "Zapri", previous: "Prejšnja", next: "Naslednja", project: "PROJEKT", description: "OPIS", contact: "VAS ZANIMA PODOBEN PROJEKT?", call: "Pokličite nas", email: "Pošljite e-pošto", inquiry: "Pošljite povpraševanje" },
+  de: { kicker: "JUSKO GRAD / PROJEKTE", title: "Projektgalerie", subtitle: "Fotos von Projekten, Baustellen und abgeschlossenen Arbeiten.", completed: "AUSGEFÜHRTE ARBEITEN", oneProject: "veröffentlichtes Projekt", projects: "veröffentlichte Projekte", onePhoto: "Foto", photos: "Fotos", emptyTitle: "Die Galerie ist derzeit leer", emptyText: "Neue Projekte werden demnächst veröffentlicht.", galleryLabel: "Projektgalerie", close: "Schließen", previous: "Zurück", next: "Weiter", project: "PROJEKT", description: "BESCHREIBUNG", contact: "INTERESSE AN EINEM ÄHNLICHEN PROJEKT?", call: "Rufen Sie uns an", email: "E-Mail senden", inquiry: "Anfrage senden" },
 } satisfies Record<Lang, Record<string, string>>;
 
 export default function GalleryPage() {
@@ -87,7 +87,11 @@ export default function GalleryPage() {
           <button className="project-viewer-close" type="button" aria-label={t.close}><X size={24} /></button>
           <div className="project-viewer-panel" onClick={(event) => event.stopPropagation()}>
             <div className="project-viewer-image"><img src={selectedProject.images[selectedImage].url} alt={selectedProject.title} /></div>
-            <div className="project-viewer-info"><h2>{selectedProject.title}</h2><p>{selectedProject.description}</p><span>{selectedImage + 1} / {selectedProject.images.length}</span></div>
+            <div className="project-viewer-info">
+              <div className="project-viewer-copy"><span className="project-viewer-eyebrow">{t.project}</span><h2>{selectedProject.title}</h2><div className="project-viewer-description"><strong>{t.description}</strong><p>{selectedProject.description}</p></div></div>
+              <div className="project-viewer-contact"><strong>{t.contact}</strong><div><a href="tel:+38670749086" aria-label={t.call} title={t.call}><Phone size={18} /></a><a href="mailto:info@juskograd.com" aria-label={t.email} title={t.email}><Mail size={18} /></a><a href="/#contact" aria-label={t.inquiry} title={t.inquiry}><MessageCircle size={18} /></a></div></div>
+              <span className="project-viewer-count">{selectedImage + 1} / {selectedProject.images.length}</span>
+            </div>
           </div>
           {selectedProject.images.length > 1 && <>
             <button className="project-viewer-arrow left" type="button" aria-label={t.previous} onClick={(event) => { event.stopPropagation(); setSelectedImage((selectedImage - 1 + selectedProject.images.length) % selectedProject.images.length); }}>‹</button>
