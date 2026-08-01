@@ -68,7 +68,7 @@ export default function About({ lang }: AboutProps) {
           <div className="about-visual-image">
             <Image
               src={aboutImage}
-              unoptimized={aboutImage.startsWith("blob:")}
+              unoptimized={aboutImage.startsWith("http") || aboutImage.startsWith("blob:")}
               alt={t.imageTitle}
               fill
               sizes="(max-width: 900px) 100vw, 42vw"

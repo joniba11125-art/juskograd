@@ -263,7 +263,7 @@ export default function References({ lang }: ReferencesProps) {
             <div className="reference-image">
               <Image
                 src={overrideImages[index]}
-                unoptimized={overrideImages[index].startsWith("blob:")}
+                unoptimized={overrideImages[index].startsWith("http") || overrideImages[index].startsWith("blob:")}
                 alt={project.title}
                 fill
                 sizes="(max-width: 820px) 100vw, 50vw"
