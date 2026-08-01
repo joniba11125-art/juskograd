@@ -8,12 +8,18 @@ import { GalleryProject, getGalleryProjects } from "@/lib/gallery-db";
 import type { Lang } from "@/lib/language";
 
 const LANGUAGE_KEY = "juskograd-language";
+const galleryCopy = {
+  bs: { kicker: "JUSKO GRAD / PROJEKTI", title: "Galerija radova", subtitle: "Fotografije projekata, gradilišta i završenih radova.", completed: "IZVEDENI RADOVI", oneProject: "objavljen projekt", projects: "objavljenih projekata", onePhoto: "fotografija", photos: "fotografije", emptyTitle: "Galerija je trenutno prazna", emptyText: "Novi projekti bit će objavljeni uskoro.", galleryLabel: "Galerija projekata", close: "Zatvori", previous: "Prethodna", next: "Sljedeća" },
+  sl: { kicker: "JUSKO GRAD / PROJEKTI", title: "Galerija del", subtitle: "Fotografije projektov, gradbišč in zaključenih del.", completed: "IZVEDENA DELA", oneProject: "objavljen projekt", projects: "objavljeni projekti", onePhoto: "fotografija", photos: "fotografije", emptyTitle: "Galerija je trenutno prazna", emptyText: "Novi projekti bodo objavljeni kmalu.", galleryLabel: "Galerija projektov", close: "Zapri", previous: "Prejšnja", next: "Naslednja" },
+  de: { kicker: "JUSKO GRAD / PROJEKTE", title: "Projektgalerie", subtitle: "Fotos von Projekten, Baustellen und abgeschlossenen Arbeiten.", completed: "AUSGEFÜHRTE ARBEITEN", oneProject: "veröffentlichtes Projekt", projects: "veröffentlichte Projekte", onePhoto: "Foto", photos: "Fotos", emptyTitle: "Die Galerie ist derzeit leer", emptyText: "Neue Projekte werden demnächst veröffentlicht.", galleryLabel: "Projektgalerie", close: "Schließen", previous: "Zurück", next: "Weiter" },
+} satisfies Record<Lang, Record<string, string>>;
 
 export default function GalleryPage() {
   const [lang, setLangState] = useState<Lang>("sl");
   const [projects, setProjects] = useState<GalleryProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<GalleryProject | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
+  const t = galleryCopy[lang];
 
   useEffect(() => {
     const savedLanguage = window.localStorage.getItem(LANGUAGE_KEY);
@@ -45,13 +51,13 @@ export default function GalleryPage() {
       <Header lang={lang} setLang={setLang} />
       <main className="upload-gallery-page public-gallery-page">
         <section className="upload-gallery-hero">
-          <p className="section-kicker">JUSKO GRAD / PROJEKTI</p>
-          <h1>Galerija radova</h1>
-          <p>Fotografije projekata, gradilišta i završenih radova.</p>
+          <p className="section-kicker">{t.kicker}</p>
+          <h1>{t.title}</h1>
+          <p>{t.subtitle}</p>
         </section>
 
-        <section className="upload-gallery-content" aria-label="Galerija projekata">
-          <div className="public-gallery-intro"><span>IZVEDENI RADOVI</span><p>{projects.length} {projects.length === 1 ? "objavljen projekt" : "objavljenih projekata"}</p></div>
+        <section className="upload-gallery-content" aria-label={t.galleryLabel}>
+          <div className="public-gallery-intro"><span>{t.completed}</span><p>{projects.length} {projects.length === 1 ? t.oneProject : t.projects}</p></div>
 
           {projects.length ? (
             <div className="public-project-grid">
@@ -59,7 +65,7 @@ export default function GalleryPage() {
                 <article className="public-project-card" key={project.id}>
                   <button type="button" onClick={() => { setSelectedProject(project); setSelectedImage(0); }}>
                     <img src={project.images[0].url} alt={project.title} />
-                    <span>{project.images.length} {project.images.length === 1 ? "fotografija" : "fotografija"}</span>
+                    <span>{project.images.length} {project.images.length === 1 ? t.onePhoto : t.photos}</span>
                   </button>
                   <div><h2>{project.title}</h2><p>{project.description}</p></div>
                 </article>
@@ -68,8 +74,8 @@ export default function GalleryPage() {
           ) : (
             <div className="gallery-empty-state public-gallery-empty">
               <span className="public-gallery-empty-icon"><Images size={36} /></span>
-              <h2>Galerija je trenutno prazna</h2>
-              <p>Novi projekti bit će objavljeni uskoro.</p>
+              <h2>{t.emptyTitle}</h2>
+              <p>{t.emptyText}</p>
             </div>
           )}
         </section>
@@ -78,14 +84,14 @@ export default function GalleryPage() {
 
       {selectedProject && (
         <div className="project-viewer" role="dialog" aria-modal="true" onClick={() => setSelectedProject(null)}>
-          <button className="project-viewer-close" type="button" aria-label="Zatvori"><X size={24} /></button>
+          <button className="project-viewer-close" type="button" aria-label={t.close}><X size={24} /></button>
           <div className="project-viewer-panel" onClick={(event) => event.stopPropagation()}>
             <div className="project-viewer-image"><img src={selectedProject.images[selectedImage].url} alt={selectedProject.title} /></div>
             <div className="project-viewer-info"><h2>{selectedProject.title}</h2><p>{selectedProject.description}</p><span>{selectedImage + 1} / {selectedProject.images.length}</span></div>
           </div>
           {selectedProject.images.length > 1 && <>
-            <button className="project-viewer-arrow left" type="button" aria-label="Prethodna" onClick={(event) => { event.stopPropagation(); setSelectedImage((selectedImage - 1 + selectedProject.images.length) % selectedProject.images.length); }}>‹</button>
-            <button className="project-viewer-arrow right" type="button" aria-label="Sljedeća" onClick={(event) => { event.stopPropagation(); setSelectedImage((selectedImage + 1) % selectedProject.images.length); }}>›</button>
+            <button className="project-viewer-arrow left" type="button" aria-label={t.previous} onClick={(event) => { event.stopPropagation(); setSelectedImage((selectedImage - 1 + selectedProject.images.length) % selectedProject.images.length); }}>‹</button>
+            <button className="project-viewer-arrow right" type="button" aria-label={t.next} onClick={(event) => { event.stopPropagation(); setSelectedImage((selectedImage + 1) % selectedProject.images.length); }}>›</button>
           </>}
         </div>
       )}

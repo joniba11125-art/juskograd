@@ -5,6 +5,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     navAbout: "O firmi",
     navServices: "Usluge",
     navReferences: "Reference",
+    navGallery: "Galerija",
     navContact: "Kontakt",
 
     popupTitle: "Izaberite jezik",
@@ -26,6 +27,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     navAbout: "O podjetju",
     navServices: "Storitve",
     navReferences: "Reference",
+    navGallery: "Galerija",
     navContact: "Kontakt",
 
     popupTitle: "Izberite jezik",
@@ -47,6 +49,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     navAbout: "Über uns",
     navServices: "Leistungen",
     navReferences: "Referenzen",
+    navGallery: "Galerie",
     navContact: "Kontakt",
 
     popupTitle: "Sprache wählen",

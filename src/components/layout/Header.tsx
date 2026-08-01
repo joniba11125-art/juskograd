@@ -25,7 +25,7 @@ export default function Header({ lang, setLang }: HeaderProps) {
       const hero = document.querySelector(".hero");
 
       if (!hero) {
-        setIsOverLight(window.scrollY > 120);
+        setIsOverLight(true);
         return;
       }
 
@@ -64,7 +64,7 @@ export default function Header({ lang, setLang }: HeaderProps) {
         <a href="/#about">{t.navAbout}</a>
         <a href="/#services">{t.navServices}</a>
         <a href="/#references">{t.navReferences}</a>
-        <a href="/galerija">Galerija</a>
+        <a href="/galerija">{t.navGallery}</a>
         <a href="/#contact">{t.navContact}</a>
       </nav>
 
