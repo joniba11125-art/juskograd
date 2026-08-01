@@ -271,12 +271,13 @@ ${form.message}`
             </div>
 
             <div className="map-card">
-              <div className="map-title">{t.mapTitle}</div>
+              <a className="map-title" href="https://www.openstreetmap.org/?mlat=45.9224122&mlon=14.3649373#map=17/45.9224122/14.3649373" target="_blank" rel="noreferrer">{t.mapTitle}</a>
+              <div className="map-address"><strong>JUSKO GRAD</strong><span>Ob Borovniščici 16 · Borovnica</span></div>
               <iframe
                 title="JUSKO GRAD lokacija"
-                src="https://www.google.com/maps?q=Ob%20Borovni%C5%A1%C4%8Dici%2016%2C%201353%20Borovnica%2C%20Slovenija&output=embed"
+                src="https://www.openstreetmap.org/export/embed.html?bbox=14.3589%2C45.9194%2C14.3709%2C45.9254&layer=mapnik&marker=45.9224122%2C14.3649373"
                 loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
+                referrerPolicy="no-referrer"
               />
             </div>
           </div>

@@ -1976,8 +1976,12 @@ main::before {
   height: 100%;
   min-height: 300px;
   border: 0;
-  filter: saturate(0.85) contrast(1.05);
+  filter: saturate(.72) contrast(1.06) brightness(1.04);
 }
+
+.map-address { position: absolute; left: 14px; bottom: 14px; z-index: 4; display: grid; gap: 3px; padding: 11px 14px; border: 1px solid rgba(255,255,255,.72); border-radius: 14px; background: rgba(255,255,255,.88); color: #071d33; box-shadow: 0 14px 35px rgba(7,29,51,.16); backdrop-filter: blur(12px); pointer-events: none; }
+.map-address strong { color: #0873bd; font-size: 10px; letter-spacing: .13em; }
+.map-address span { font-size: 11px; font-weight: 750; }
 
 @media (max-width: 900px) {
   .contact-head,
