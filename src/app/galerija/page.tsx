@@ -31,12 +31,14 @@ export default function GalleryPage() {
   useEffect(() => {
     if (!selectedProject) return;
     document.body.style.overflow = "hidden";
+    document.body.classList.add("project-viewer-open");
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") setSelectedProject(null);
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => {
       document.body.style.overflow = "";
+      document.body.classList.remove("project-viewer-open");
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [selectedProject]);
