@@ -81,7 +81,7 @@ export default function GalleryPage() {
           <button className="project-viewer-close" type="button" aria-label="Zatvori"><X size={24} /></button>
           <div className="project-viewer-panel" onClick={(event) => event.stopPropagation()}>
             <div className="project-viewer-image"><img src={selectedProject.images[selectedImage].url} alt={selectedProject.title} /></div>
-            <div className="project-viewer-info"><span>{selectedImage + 1} / {selectedProject.images.length}</span><h2>{selectedProject.title}</h2><p>{selectedProject.description}</p></div>
+            <div className="project-viewer-info"><h2>{selectedProject.title}</h2><p>{selectedProject.description}</p><span>{selectedImage + 1} / {selectedProject.images.length}</span></div>
           </div>
           {selectedProject.images.length > 1 && <>
             <button className="project-viewer-arrow left" type="button" aria-label="Prethodna" onClick={(event) => { event.stopPropagation(); setSelectedImage((selectedImage - 1 + selectedProject.images.length) % selectedProject.images.length); }}>‹</button>

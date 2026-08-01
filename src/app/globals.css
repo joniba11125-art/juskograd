@@ -12891,9 +12891,9 @@ body.worksite-gallery-open {
 .project-viewer-panel { width: min(1080px, 100%); max-height: calc(100vh - 100px); display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, .5fr); overflow: hidden; border-radius: 26px; background: #fff; box-shadow: 0 35px 120px rgba(0,0,0,.42); }
 .project-viewer-image { min-height: 580px; background: #06182a; }
 .project-viewer-image img { width: 100%; height: 100%; max-height: calc(100vh - 100px); object-fit: contain; }
-.project-viewer-info { display: flex; flex-direction: column; justify-content: flex-end; padding: 30px; }
-.project-viewer-info span { color: #0873bd; font-size: 11px; font-weight: 900; letter-spacing: .14em; }
-.project-viewer-info h2 { margin: 13px 0 0; font-size: 32px; line-height: 1; letter-spacing: -.05em; }
+.project-viewer-info { display: flex; flex-direction: column; justify-content: flex-start; padding: 30px; }
+.project-viewer-info span { margin-top: auto; color: #0873bd; font-size: 11px; font-weight: 900; letter-spacing: .14em; }
+.project-viewer-info h2 { margin: 0; font-size: 32px; line-height: 1; letter-spacing: -.05em; }
 .project-viewer-info p { margin: 16px 0 0; color: #64748b; line-height: 1.65; }
 .project-viewer-close, .project-viewer-arrow { position: fixed; z-index: 2; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.12); color: #fff; cursor: pointer; backdrop-filter: blur(10px); }
 .project-viewer-close { top: 20px; right: 22px; width: 46px; height: 46px; border-radius: 999px; }
