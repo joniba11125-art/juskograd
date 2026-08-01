@@ -1,0 +1,266 @@
+"use client";
+
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Check, ImagePlus, Images, Trash2, X } from "lucide-react";
+import { deleteGalleryProject, GalleryProject, getGalleryProjects, saveGalleryProject } from "@/lib/gallery-db";
+import { getHomepageImage, homepageImageSlots, setHomepageImage } from "@/lib/homepage-media";
+
+const MAX_FILE_SIZE = 12 * 1024 * 1024;
+const CROP_RATIO = 4 / 3;
+
+async function cropToFourThree(file: File) {
+  const bitmap = await createImageBitmap(file);
+  const sourceRatio = bitmap.width / bitmap.height;
+  let sourceWidth = bitmap.width;
+  let sourceHeight = bitmap.height;
+  let sourceX = 0;
+  let sourceY = 0;
+
+  if (sourceRatio > CROP_RATIO) {
+    sourceWidth = bitmap.height * CROP_RATIO;
+    sourceX = (bitmap.width - sourceWidth) / 2;
+  } else {
+    sourceHeight = bitmap.width / CROP_RATIO;
+    sourceY = (bitmap.height - sourceHeight) / 2;
+  }
+
+  const targetWidth = Math.min(1600, Math.floor(sourceWidth));
+  const targetHeight = Math.round(targetWidth / CROP_RATIO);
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas nije dostupan");
+  context.drawImage(bitmap, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+  bitmap.close();
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((result) => result ? resolve(result) : reject(new Error("Obrada slike nije uspjela")), "image/webp", 0.9);
+  });
+  return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".webp", { type: "image/webp" });
+}
+
+export default function AdminPage() {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [projects, setProjects] = useState<GalleryProject[]>([]);
+  const [status, setStatus] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCropping, setIsCropping] = useState(false);
+  const [homepagePreviews, setHomepagePreviews] = useState<Record<string, string>>(
+    Object.fromEntries(homepageImageSlots.map((slot) => [slot.id, slot.defaultSrc])),
+  );
+
+  const previews = useMemo(() => files.map((file) => ({ file, url: URL.createObjectURL(file) })), [files]);
+
+  useEffect(() => {
+    getGalleryProjects().then(setProjects).catch(() => setStatus("Sadržaj nije moguće učitati."));
+    homepageImageSlots.forEach((slot) => {
+      getHomepageImage(slot.id).then((blob) => {
+        if (blob) setHomepagePreviews((current) => ({ ...current, [slot.id]: URL.createObjectURL(blob) }));
+      });
+    });
+  }, []);
+
+  useEffect(() => () => previews.forEach((preview) => URL.revokeObjectURL(preview.url)), [previews]);
+
+  async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
+    const originalCount = event.target.files?.length ?? 0;
+    const selected = Array.from(event.target.files ?? []).filter(
+      (file) => file.type.startsWith("image/") && file.size <= MAX_FILE_SIZE,
+    );
+    event.target.value = "";
+    if (!selected.length) {
+      setStatus("Odaberite slike veličine do 12 MB.");
+      return;
+    }
+
+    setIsCropping(true);
+    setStatus("Obrezujem slike na format 4:3...");
+    try {
+      const cropped = await Promise.all(selected.map(cropToFourThree));
+      setFiles((current) => [...current, ...cropped].slice(0, 12));
+      setStatus(`${cropped.length} ${cropped.length === 1 ? "slika je obrezana" : "slike su obrezane"} na format 4:3.`);
+    } catch {
+      setStatus("Neke slike nije bilo moguće obraditi.");
+    } finally {
+      setIsCropping(false);
+    }
+    if (selected.length !== originalCount) setStatus("Neke slike su preskočene. Maksimalna veličina je 12 MB.");
+  }
+
+  async function publishProject(event: FormEvent) {
+    event.preventDefault();
+    if (!title.trim() || !description.trim() || !files.length) {
+      setStatus("Unesite naziv, opis i najmanje jednu sliku.");
+      return;
+    }
+
+    setIsSaving(true);
+    const project: GalleryProject = {
+      id: crypto.randomUUID(),
+      title: title.trim(),
+      description: description.trim(),
+      images: files,
+      createdAt: Date.now(),
+    };
+
+    try {
+      await saveGalleryProject(project);
+      setProjects((current) => [project, ...current]);
+      setTitle("");
+      setDescription("");
+      setFiles([]);
+      setStatus("Projekt je objavljen u galeriji.");
+    } catch {
+      setStatus("Projekt nije spremljen. Provjerite slobodan prostor u pregledniku.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function removeProject(project: GalleryProject) {
+    if (!window.confirm(`Obrisati projekt „${project.title}“?`)) return;
+    await deleteGalleryProject(project.id);
+    setProjects((current) => current.filter((item) => item.id !== project.id));
+    setStatus("Projekt je obrisan.");
+  }
+
+  async function replaceHomepageImage(slotId: string, file?: File) {
+    if (!file || !file.type.startsWith("image/") || file.size > MAX_FILE_SIZE) {
+      setStatus("Odaberite sliku veličine do 12 MB.");
+      return;
+    }
+    setStatus("Obrezujem novu sliku na format 4:3...");
+    const cropped = await cropToFourThree(file);
+    await setHomepageImage(slotId, cropped);
+    setHomepagePreviews((current) => ({ ...current, [slotId]: URL.createObjectURL(cropped) }));
+    setStatus("Slika na naslovnoj stranici je zamijenjena.");
+  }
+
+  async function resetHomepageImage(slotId: string, defaultSrc: string) {
+    await setHomepageImage(slotId, null);
+    setHomepagePreviews((current) => ({ ...current, [slotId]: defaultSrc }));
+    setStatus("Vraćena je originalna slika.");
+  }
+
+  return (
+    <main className="admin-page">
+      <aside className="admin-sidebar">
+        <a className="admin-brand" href="/">
+          <img src="/images/logo/juskograd-logo.png" alt="JUSKO GRAD" />
+        </a>
+        <div className="admin-nav-label">UPRAVLJANJE</div>
+        <nav>
+          <a className="active" href="/admin"><Images size={19} /> Galerija</a>
+          <a href="/galerija"><ArrowLeft size={19} /> Javna galerija</a>
+        </nav>
+        <span className="admin-local-badge">Lokalna administracija</span>
+      </aside>
+
+      <section className="admin-main">
+        <header className="admin-header">
+          <div>
+            <span>JUSKO GRAD CMS</span>
+            <h1>Upravljanje galerijom</h1>
+            <p>Dodajte novi projekt koji će se prikazati na javnoj stranici.</p>
+          </div>
+          <a href="/galerija">Pogledaj galeriju ↗</a>
+        </header>
+
+        <div className="admin-layout-grid">
+          <form className="admin-form-card" onSubmit={publishProject}>
+            <div className="admin-card-heading">
+              <span>01</span>
+              <div><h2>Novi projekt</h2><p>Unesite osnovne podatke i fotografije.</p></div>
+            </div>
+
+            <label className="admin-field">
+              <span>Naziv projekta</span>
+              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Npr. Vanjsko uređenje — Ljubljana" maxLength={100} />
+            </label>
+
+            <label className="admin-field">
+              <span>Opis</span>
+              <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Kratko opišite izvedene radove..." rows={6} maxLength={600} />
+              <small>{description.length} / 600</small>
+            </label>
+
+            <label className="admin-image-picker">
+              <input type="file" accept="image/*" multiple onChange={(event) => void handleFiles(event)} disabled={isCropping} />
+              <ImagePlus size={28} />
+              <strong>{isCropping ? "Obrezujem slike..." : "Odaberi slike"}</strong>
+              <span>Sve slike se automatski obrezuju na 4:3 · do 12 slika</span>
+            </label>
+
+            {previews.length > 0 && (
+              <div className="admin-preview-grid">
+                {previews.map((preview, index) => (
+                  <div key={`${preview.file.name}-${index}`}>
+                    <img src={preview.url} alt="Pregled odabrane slike" />
+                    <button type="button" aria-label="Ukloni sliku" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={15} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {status && <p className="admin-status" role="status">{status}</p>}
+
+            <button className="admin-publish-button" type="submit" disabled={isSaving || isCropping}>
+              <Check size={19} /> {isSaving ? "Objavljujem..." : "Objavi projekt"}
+            </button>
+          </form>
+
+          <section className="admin-projects-card">
+            <div className="admin-card-heading">
+              <span>02</span>
+              <div><h2>Objavljeni projekti</h2><p>{projects.length} {projects.length === 1 ? "projekt" : "projekata"} u galeriji</p></div>
+            </div>
+
+            {projects.length ? (
+              <div className="admin-project-list">
+                {projects.map((project) => {
+                  const coverUrl = URL.createObjectURL(project.images[0]);
+                  return (
+                    <article key={project.id}>
+                      <img src={coverUrl} alt="" onLoad={() => URL.revokeObjectURL(coverUrl)} />
+                      <div><strong>{project.title}</strong><span>{project.images.length} {project.images.length === 1 ? "slika" : "slika"}</span></div>
+                      <button type="button" onClick={() => void removeProject(project)} aria-label={`Obriši ${project.title}`}><Trash2 size={17} /></button>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="admin-empty-projects"><Images size={30} /><strong>Nema objavljenih projekata</strong><span>Prvi projekt će se pojaviti ovdje.</span></div>
+            )}
+          </section>
+        </div>
+
+        <section className="admin-homepage-media" id="naslovna">
+          <div className="admin-card-heading">
+            <span>03</span>
+            <div><h2>Slike naslovne stranice</h2><p>Zamijenite bilo koju glavnu fotografiju. Sve nove slike automatski se obrezuju na 4:3.</p></div>
+          </div>
+          <div className="admin-media-grid">
+            {homepageImageSlots.map((slot) => (
+              <article key={slot.id}>
+                <img src={homepagePreviews[slot.id]} alt={slot.label} />
+                <div>
+                  <span className="admin-media-section">SEKCIJA: {slot.section}</span>
+                  <strong>{slot.label}</strong>
+                  <small>Koristi se u: {slot.usage}</small>
+                  <label>
+                    Zamijeni sliku
+                    <input type="file" accept="image/*" onChange={(event) => { void replaceHomepageImage(slot.id, event.target.files?.[0]); event.target.value = ""; }} />
+                  </label>
+                  <button type="button" onClick={() => void resetHomepageImage(slot.id, slot.defaultSrc)}>Vrati original</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </section>
+    </main>
+  );
+}
