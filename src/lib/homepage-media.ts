@@ -62,14 +62,15 @@ export const homepageImageSlots = [
   },
 ];
 
-function publicUrl(path: string) {
-  return supabase.storage.from("site-images").getPublicUrl(path).data.publicUrl;
+function publicUrl(path: string, version?: string) {
+  const url = supabase.storage.from("site-images").getPublicUrl(path).data.publicUrl;
+  return version ? `${url}?v=${encodeURIComponent(version)}` : url;
 }
 
 export async function getHomepageImage(id: string) {
-  const { data, error } = await supabase.from("homepage_images").select("storage_path").eq("slot_id", id).maybeSingle();
+  const { data, error } = await supabase.from("homepage_images").select("storage_path,updated_at").eq("slot_id", id).maybeSingle();
   if (error) throw error;
-  return data?.storage_path ? publicUrl(data.storage_path) : undefined;
+  return data?.storage_path ? publicUrl(data.storage_path, data.updated_at) : undefined;
 }
 
 export async function setHomepageImage(id: string, blob: Blob | null) {
@@ -91,15 +92,19 @@ export async function setHomepageImage(id: string, blob: Blob | null) {
   if (error) { await supabase.storage.from("site-images").remove([path]); throw error; }
   if (current?.storage_path) await supabase.storage.from("site-images").remove([current.storage_path]);
   window.dispatchEvent(new CustomEvent("homepage-media-change", { detail: id }));
-  return publicUrl(path);
+  return publicUrl(path, String(Date.now()));
 }
 
 export function useHomepageImage(id: string, fallback: string) {
   const [src, setSrc] = useState(fallback);
   useEffect(() => {
     async function load() {
-      const url = await getHomepageImage(id);
-      setSrc(url ?? fallback);
+      try {
+        const url = await getHomepageImage(id);
+        setSrc(url ?? fallback);
+      } catch {
+        setSrc(fallback);
+      }
     }
     void load();
     const handler = (event: Event) => { if ((event as CustomEvent<string>).detail === id) void load(); };
