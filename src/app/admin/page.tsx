@@ -1,8 +1,8 @@
 "use client";
 
 import { ChangeEvent, FormEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, ImagePlus, Images, Trash2, X } from "lucide-react";
-import { deleteGalleryProject, GalleryProject, getGalleryProjects, saveGalleryProject } from "@/lib/gallery-db";
+import { ArrowLeft, Check, ImagePlus, Images, Pencil, Trash2, X } from "lucide-react";
+import { deleteGalleryProject, GalleryProject, getGalleryProjects, saveGalleryProject, updateGalleryProject } from "@/lib/gallery-db";
 import { getHomepageImage, homepageImageSlots, setHomepageImage } from "@/lib/homepage-media";
 import { supabase } from "@/lib/supabase";
 
@@ -89,6 +89,7 @@ export default function AdminPage() {
   const [description, setDescription] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [projects, setProjects] = useState<GalleryProject[]>([]);
+  const [editingProject, setEditingProject] = useState<GalleryProject | null>(null);
   const [status, setStatus] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
@@ -150,19 +151,26 @@ export default function AdminPage() {
 
   async function publishProject(event: FormEvent) {
     event.preventDefault();
-    if (!title.trim() || !description.trim() || !files.length) {
-      setStatus("Unesite naziv, opis i najmanje jednu sliku.");
+    if (!title.trim() || !description.trim() || (!editingProject && !files.length)) {
+      setStatus(editingProject ? "Unesite naziv i opis." : "Unesite naziv, opis i najmanje jednu sliku.");
       return;
     }
 
     setIsSaving(true);
     try {
-      const project = await saveGalleryProject({ title: title.trim(), description: description.trim(), files });
-      setProjects((current) => [project, ...current]);
+      if (editingProject) {
+        const project = await updateGalleryProject(editingProject, { title: title.trim(), description: description.trim(), files });
+        setProjects((current) => current.map((item) => item.id === project.id ? project : item));
+        setStatus("Izmjene su sačuvane.");
+      } else {
+        const project = await saveGalleryProject({ title: title.trim(), description: description.trim(), files });
+        setProjects((current) => [project, ...current]);
+        setStatus("Projekt je objavljen u galeriji.");
+      }
       setTitle("");
       setDescription("");
       setFiles([]);
-      setStatus("Projekt je objavljen u galeriji.");
+      setEditingProject(null);
     } catch {
       setStatus("Projekt nije spremljen. Provjerite Supabase postavke i pokušajte ponovo.");
     } finally {
@@ -175,6 +183,19 @@ export default function AdminPage() {
     await deleteGalleryProject(project);
     setProjects((current) => current.filter((item) => item.id !== project.id));
     setStatus("Projekt je obrisan.");
+  }
+
+  function editProject(project: GalleryProject) {
+    setEditingProject(project);
+    setTitle(project.title);
+    setDescription(project.description);
+    setFiles([]);
+    setStatus("Uređujete projekt. Ako ne odaberete nove slike, postojeće ostaju.");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelEditing() {
+    setEditingProject(null); setTitle(""); setDescription(""); setFiles([]); setStatus("Uređivanje je otkazano.");
   }
 
   async function replaceHomepageImage(slotId: string, file?: File) {
@@ -272,7 +293,7 @@ export default function AdminPage() {
           <form className="admin-form-card" onSubmit={publishProject}>
             <div className="admin-card-heading">
               <span>01</span>
-              <div><h2>Novi projekt</h2><p>Unesite osnovne podatke i fotografije.</p></div>
+              <div><h2>{editingProject ? "Uredi projekt" : "Novi projekt"}</h2><p>{editingProject ? "Promijenite tekst ili odaberite potpuno nove fotografije." : "Unesite osnovne podatke i fotografije."}</p></div>
             </div>
 
             <label className="admin-field">
@@ -289,8 +310,8 @@ export default function AdminPage() {
             <label className="admin-image-picker">
               <input type="file" accept="image/*" multiple onChange={(event) => void handleFiles(event)} disabled={isCropping} />
               <ImagePlus size={28} />
-              <strong>{isCropping ? "Obrezujem slike..." : "Odaberi slike"}</strong>
-              <span>Sve slike se automatski obrezuju na 4:3 · do 12 slika</span>
+              <strong>{isCropping ? "Obrezujem slike..." : editingProject ? "Zamijeni sve slike (opcionalno)" : "Odaberi slike"}</strong>
+              <span>{editingProject ? "Ako ništa ne odaberete, postojeće slike ostaju." : "Sve slike se obrezuju na 4:3 · do 12 slika"}</span>
             </label>
 
             {previews.length > 0 && (
@@ -307,8 +328,9 @@ export default function AdminPage() {
             {status && <p className="admin-status" role="status">{status}</p>}
 
             <button className="admin-publish-button" type="submit" disabled={isSaving || isCropping}>
-              <Check size={19} /> {isSaving ? "Objavljujem..." : "Objavi projekt"}
+              <Check size={19} /> {isSaving ? "Spremam..." : editingProject ? "Sačuvaj izmjene" : "Objavi projekt"}
             </button>
+            {editingProject && <button className="admin-cancel-edit" type="button" onClick={cancelEditing}>Odustani od uređivanja</button>}
           </form>
 
           <section className="admin-projects-card">
@@ -323,7 +345,7 @@ export default function AdminPage() {
                     <article key={project.id}>
                       <img src={project.images[0].url} alt="" />
                       <div><strong>{project.title}</strong><span>{project.images.length} {project.images.length === 1 ? "slika" : "slika"}</span></div>
-                      <button type="button" onClick={() => void removeProject(project)} aria-label={`Obriši ${project.title}`}><Trash2 size={17} /></button>
+                      <div className="admin-project-actions"><button type="button" onClick={() => editProject(project)} aria-label={`Uredi ${project.title}`}><Pencil size={16} /></button><button type="button" onClick={() => void removeProject(project)} aria-label={`Obriši ${project.title}`}><Trash2 size={17} /></button></div>
                     </article>
                 ))}
               </div>

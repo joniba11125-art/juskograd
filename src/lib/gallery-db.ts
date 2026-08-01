@@ -97,3 +97,38 @@ export async function deleteGalleryProject(project: GalleryProject) {
   const { error } = await supabase.from("gallery_projects").delete().eq("id", project.id);
   if (error) throw error;
 }
+
+export async function updateGalleryProject(project: GalleryProject, input: { title: string; description: string; files: File[] }) {
+  const { error: projectError } = await supabase.from("gallery_projects").update({ title: input.title, description: input.description }).eq("id", project.id);
+  if (projectError) throw projectError;
+
+  if (input.files.length) {
+    const uploadedPaths: string[] = [];
+    const insertedIds: string[] = [];
+    try {
+      for (let index = 0; index < input.files.length; index += 1) {
+        const path = `gallery/${project.id}/${String(index + 1).padStart(2, "0")}-${crypto.randomUUID()}.webp`;
+        const { error } = await supabase.storage.from("site-images").upload(path, input.files[index], { contentType: "image/webp" });
+        if (error) throw error;
+        uploadedPaths.push(path);
+      }
+      const { data: inserted, error: imageError } = await supabase.from("gallery_images").insert(
+        uploadedPaths.map((path, index) => ({ project_id: project.id, storage_path: path, sort_order: index })),
+      ).select("id");
+      if (imageError) throw imageError;
+      insertedIds.push(...(inserted ?? []).map((item) => item.id));
+      if (project.images.length) {
+        const { error: deleteError } = await supabase.from("gallery_images").delete().in("id", project.images.map((image) => image.id));
+        if (deleteError) throw deleteError;
+        await supabase.storage.from("site-images").remove(project.images.map((image) => image.storagePath));
+      }
+    } catch (error) {
+      if (insertedIds.length) await supabase.from("gallery_images").delete().in("id", insertedIds);
+      if (uploadedPaths.length) await supabase.storage.from("site-images").remove(uploadedPaths);
+      throw error;
+    }
+  }
+
+  const projects = await getGalleryProjects();
+  return projects.find((item) => item.id === project.id)!;
+}

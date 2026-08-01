@@ -12869,9 +12869,10 @@ body.worksite-gallery-open {
 .admin-publish-button { width: 100%; min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 18px; border: 0; border-radius: 14px; background: #0873bd; color: #fff; font: inherit; font-weight: 900; cursor: pointer; box-shadow: 0 15px 34px rgba(8,115,189,.2); }
 .admin-publish-button:hover { background: #071d33; }
 .admin-publish-button:disabled { opacity: .55; cursor: wait; }
+.admin-cancel-edit { width: 100%; min-height: 42px; margin-top: 9px; border: 0; border-radius: 12px; background: #eaf1f7; color: #52677b; font: inherit; font-size: 12px; font-weight: 850; cursor: pointer; }
 
 .admin-project-list { display: grid; gap: 10px; }
-.admin-project-list article { display: grid; grid-template-columns: 70px minmax(0, 1fr) 38px; align-items: center; gap: 12px; padding: 9px; border: 1px solid #e3ebf2; border-radius: 15px; }
+.admin-project-list article { display: grid; grid-template-columns: 70px minmax(0, 1fr) 82px; align-items: center; gap: 12px; padding: 9px; border: 1px solid #e3ebf2; border-radius: 15px; }
 .admin-project-list article > img { width: 70px; height: 58px; object-fit: cover; border-radius: 10px; }
 .admin-project-list article div { min-width: 0; }
 .admin-project-list strong, .admin-project-list span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -12879,6 +12880,8 @@ body.worksite-gallery-open {
 .admin-project-list span { margin-top: 4px; color: #7b8b9c; font-size: 11px; }
 .admin-project-list button { width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 10px; background: #f3f6f9; color: #718096; cursor: pointer; }
 .admin-project-list button:hover { background: #fee8e8; color: #c62828; }
+.admin-project-actions { display: flex; gap: 6px; }
+.admin-project-actions button:first-child:hover { background: #e4f3ff; color: #0873bd; }
 .admin-empty-projects { min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #8da0b2; text-align: center; }
 .admin-empty-projects strong { margin-top: 13px; color: #071d33; }
 .admin-empty-projects span { margin-top: 5px; font-size: 12px; }
