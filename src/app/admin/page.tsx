@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, ImagePlus, Images, Trash2, X } from "lucide-react";
 import { deleteGalleryProject, GalleryProject, getGalleryProjects, saveGalleryProject } from "@/lib/gallery-db";
 import { getHomepageImage, homepageImageSlots, setHomepageImage } from "@/lib/homepage-media";
@@ -9,22 +9,13 @@ import { supabase } from "@/lib/supabase";
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const CROP_RATIO = 4 / 3;
 
-async function cropToFourThree(file: File) {
+async function cropToFourThree(file: File, zoom = 1, offsetX = 0, offsetY = 0, viewportWidth = 800, viewportHeight = 600) {
   const bitmap = await createImageBitmap(file);
-  const sourceRatio = bitmap.width / bitmap.height;
-  let sourceWidth = bitmap.width;
-  let sourceHeight = bitmap.height;
-  let sourceX = 0;
-  let sourceY = 0;
-
-  if (sourceRatio > CROP_RATIO) {
-    sourceWidth = bitmap.height * CROP_RATIO;
-    sourceX = (bitmap.width - sourceWidth) / 2;
-  } else {
-    sourceHeight = bitmap.width / CROP_RATIO;
-    sourceY = (bitmap.height - sourceHeight) / 2;
-  }
-
+  const scale = Math.max(viewportWidth / bitmap.width, viewportHeight / bitmap.height) * zoom;
+  const sourceWidth = viewportWidth / scale;
+  const sourceHeight = viewportHeight / scale;
+  const sourceX = Math.max(0, Math.min(bitmap.width - sourceWidth, (bitmap.width - sourceWidth) / 2 - offsetX / scale));
+  const sourceY = Math.max(0, Math.min(bitmap.height - sourceHeight, (bitmap.height - sourceHeight) / 2 - offsetY / scale));
   const targetWidth = Math.min(1600, Math.floor(sourceWidth));
   const targetHeight = Math.round(targetWidth / CROP_RATIO);
   const canvas = document.createElement("canvas");
@@ -41,6 +32,53 @@ async function cropToFourThree(file: File) {
   return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".webp", { type: "image/webp" });
 }
 
+function CropEditor({ file, index, total, onCancel, onConfirm }: { file: File; index: number; total: number; onCancel: () => void; onConfirm: (file: File) => void }) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [imageRatio, setImageRatio] = useState(CROP_RATIO);
+  const [saving, setSaving] = useState(false);
+  const url = useMemo(() => URL.createObjectURL(file), [file]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+
+  function pointerDown(event: PointerEvent<HTMLDivElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = { x: offset.x, y: offset.y, startX: event.clientX, startY: event.clientY };
+  }
+  function pointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const frame = frameRef.current;
+    if (!frame) return;
+    const baseWidth = imageRatio > CROP_RATIO ? frame.clientHeight * imageRatio : frame.clientWidth;
+    const baseHeight = imageRatio > CROP_RATIO ? frame.clientHeight : frame.clientWidth / imageRatio;
+    const maxX = Math.max(0, (baseWidth * zoom - frame.clientWidth) / 2);
+    const maxY = Math.max(0, (baseHeight * zoom - frame.clientHeight) / 2);
+    const nextX = dragRef.current.x + event.clientX - dragRef.current.startX;
+    const nextY = dragRef.current.y + event.clientY - dragRef.current.startY;
+    setOffset({ x: Math.max(-maxX, Math.min(maxX, nextX)), y: Math.max(-maxY, Math.min(maxY, nextY)) });
+  }
+  async function confirm() {
+    const frame = frameRef.current;
+    if (!frame) return;
+    setSaving(true);
+    const result = await cropToFourThree(file, zoom, offset.x, offset.y, frame.clientWidth, frame.clientHeight);
+    onConfirm(result);
+  }
+
+  return <div className="admin-crop-overlay" role="dialog" aria-modal="true" aria-label="Obrezivanje slike">
+    <div className="admin-crop-modal">
+      <div className="admin-crop-heading"><div><span>SLIKA {index + 1} / {total}</span><h2>Odaberi dio slike</h2><p>Povuci sliku prstom ili mišem i podesi zumiranje.</p></div><button type="button" onClick={onCancel} aria-label="Odustani"><X /></button></div>
+      <div className="admin-crop-frame" ref={frameRef} onPointerDown={pointerDown} onPointerMove={pointerMove}>
+        <img src={url} alt="Slika za obrezivanje" draggable={false} onLoad={(event) => setImageRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} className={imageRatio > CROP_RATIO ? "wide" : "tall"} style={{ transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${zoom})` }} />
+        <div className="admin-crop-grid" />
+      </div>
+      <label className="admin-crop-zoom"><span>Zumiranje</span><input type="range" min="1" max="3" step="0.01" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /><strong>{Math.round(zoom * 100)}%</strong></label>
+      <div className="admin-crop-actions"><button type="button" onClick={onCancel}>Odustani</button><button type="button" onClick={() => void confirm()} disabled={saving}><Check size={18} /> {saving ? "Obrađujem..." : "Potvrdi kadar"}</button></div>
+    </div>
+  </div>;
+}
+
 export default function AdminPage() {
   const [authLoading, setAuthLoading] = useState(true);
   const [adminEmail, setAdminEmail] = useState("");
@@ -54,6 +92,10 @@ export default function AdminPage() {
   const [status, setStatus] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
+  const [cropQueue, setCropQueue] = useState<File[]>([]);
+  const [cropIndex, setCropIndex] = useState(0);
+  const [cropResults, setCropResults] = useState<File[]>([]);
+  const [homepageCropSlot, setHomepageCropSlot] = useState<string | null>(null);
   const [homepagePreviews, setHomepagePreviews] = useState<Record<string, string>>(
     Object.fromEntries(homepageImageSlots.map((slot) => [slot.id, slot.defaultSrc])),
   );
@@ -98,16 +140,11 @@ export default function AdminPage() {
     }
 
     setIsCropping(true);
-    setStatus("Obrezujem slike na format 4:3...");
-    try {
-      const cropped = await Promise.all(selected.map(cropToFourThree));
-      setFiles((current) => [...current, ...cropped].slice(0, 12));
-      setStatus(`${cropped.length} ${cropped.length === 1 ? "slika je obrezana" : "slike su obrezane"} na format 4:3.`);
-    } catch {
-      setStatus("Neke slike nije bilo moguće obraditi.");
-    } finally {
-      setIsCropping(false);
-    }
+    setCropQueue(selected.slice(0, Math.max(0, 12 - files.length)));
+    setCropIndex(0);
+    setCropResults([]);
+    setHomepageCropSlot(null);
+    setStatus("Podesite kadar za svaku odabranu sliku.");
     if (selected.length !== originalCount) setStatus("Neke slike su preskočene. Maksimalna veličina je 12 MB.");
   }
 
@@ -145,11 +182,36 @@ export default function AdminPage() {
       setStatus("Odaberite sliku veličine do 12 MB.");
       return;
     }
-    setStatus("Obrezujem novu sliku na format 4:3...");
-    const cropped = await cropToFourThree(file);
-    const url = await setHomepageImage(slotId, cropped);
-    if (url) setHomepagePreviews((current) => ({ ...current, [slotId]: url }));
-    setStatus("Slika na naslovnoj stranici je zamijenjena.");
+    setIsCropping(true);
+    setCropQueue([file]);
+    setCropIndex(0);
+    setCropResults([]);
+    setHomepageCropSlot(slotId);
+    setStatus("Podesite kadar nove slike.");
+  }
+
+  async function confirmCrop(cropped: File) {
+    if (homepageCropSlot) {
+      const url = await setHomepageImage(homepageCropSlot, cropped);
+      if (url) setHomepagePreviews((current) => ({ ...current, [homepageCropSlot]: url }));
+      setCropQueue([]); setHomepageCropSlot(null); setIsCropping(false);
+      setStatus("Slika na naslovnoj stranici je zamijenjena.");
+      return;
+    }
+    const results = [...cropResults, cropped];
+    if (cropIndex < cropQueue.length - 1) {
+      setCropResults(results);
+      setCropIndex((current) => current + 1);
+    } else {
+      setFiles((current) => [...current, ...results].slice(0, 12));
+      setCropQueue([]); setCropResults([]); setCropIndex(0); setIsCropping(false);
+      setStatus(`${results.length} ${results.length === 1 ? "slika je pripremljena" : "slike su pripremljene"} u formatu 4:3.`);
+    }
+  }
+
+  function cancelCrop() {
+    setCropQueue([]); setCropResults([]); setCropIndex(0); setHomepageCropSlot(null); setIsCropping(false);
+    setStatus("Obrezivanje je otkazano.");
   }
 
   async function resetHomepageImage(slotId: string, defaultSrc: string) {
@@ -295,6 +357,7 @@ export default function AdminPage() {
           </div>
         </section>
       </section>
+      {cropQueue.length > 0 && <CropEditor key={`${cropIndex}-${cropQueue[cropIndex].name}`} file={cropQueue[cropIndex]} index={cropIndex} total={cropQueue.length} onCancel={cancelCrop} onConfirm={(file) => void confirmCrop(file)} />}
     </main>
   );
 }
